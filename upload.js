@@ -1,8 +1,13 @@
 
-var AWS = require('aws-sdk-js');
-AWS.config.loadFromPath('./config.json');
+var AWS = require('aws-sdk-js'),
+    env = process.env;
+
+
+AWS.config.update({accessKeyId: env.AWS_ACCESS_KEY, secretAccessKey: env.AWS_SECRET_KEY, region: env.AWS_REGION});
+
+//AWS.config.loadFromPath('./config.json');
 // Set your region for future requests.
-AWS.config.update({region: 'us-east-1'});
+//AWS.config.update({region: 'us-east-1'});
 
 
 var fs = require('fs');

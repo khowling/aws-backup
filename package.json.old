@@ -1,0 +1,10 @@
+
+{
+  "name": "aws-backup",
+  "description": "uploading and downloading glacier archives",
+  "author": "khowling@gmail.com",
+  "dependencies": {
+    "aws4"       : "0.1.10",
+    "aws-sdk" : "v1.0.0"
+  }
+}

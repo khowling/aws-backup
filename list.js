@@ -15,12 +15,14 @@ var arg1 = process.argv[2],
 
 console.log ('args  1: ' +  arg1 + ' 2: ' +  arg2);
 
+// LIST
 if (arg1 == 'multi' && arg2 == null) {
 	glacier.client.listMultipartUploads({vaultName: vaultName}, function (err,data) {
 		 if (err) { console.log('Error!', mpErr.stack); return; }
 		console.log('Completed in' + JSON.stringify(data, null, 4));
 	});
 }
+
 
 if (arg1 == 'multi' && arg2 !== null) {
         glacier.client.listParts({vaultName: vaultName, uploadId: arg2 }, function (err,data) {
@@ -37,10 +39,19 @@ if (arg1 == 'desc') {
 }
 
 if (arg1 == 'abort' && arg2 !== null) {
-	console.log ('aborting : ' + arg2);
+	console.log ('aborting uploadId: ' + arg2);
         glacier.client.abortMultipartUpload({vaultName: vaultName, uploadId: arg2 }, function (err,data) {
                  if (err) { console.log('Error!', mpErr.stack); return; }
                 console.log('Completed in' + JSON.stringify(data, null, 4));
         });
+}
+
+// DELETE
+if (arg1 == 'delete' && arg2 !== null) {
+	console.log ('deleting archiveId: ' + arg2);
+	glacier.client.deleteArchive({vaultName: vaultName, archiveId: arg2}, function (err,data) {
+		 if (err) { console.log('Error!', mpErr.stack); return; }
+		console.log('Completed in' + JSON.stringify(data, null, 4));
+	});
 }
 

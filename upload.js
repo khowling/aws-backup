@@ -10,7 +10,7 @@ var fs = require('fs');
 var treehash = require('treehash');
 
 var glacier = new AWS.Glacier(),
-    fname = 'vid.mp4',
+    fname = process.argv[2],
     vaultName = 'hstore',
     bufsize = 2 * 1024 * 1024;  // 2Mb chunks
 
@@ -27,7 +27,7 @@ var thStream = treehash.createTreeHashStream ();
 
 console.log('Initiating upload to' + vaultName + ', partSize: ' + bufsize.toString());
 ///* 
-glacier.client.initiateMultipartUpload({vaultName: vaultName, partSize: bufsize.toString()}, function (mpErr, multipart) {
+glacier.client.initiateMultipartUpload({vaultName: vaultName, archiveDescription: fname, partSize: bufsize.toString()}, function (mpErr, multipart) {
 
 	 if (mpErr) { console.log('Error!', mpErr.stack); return; }
          console.log("Got upload ID", multipart.uploadId);

@@ -53,9 +53,10 @@ glacier.client.initiateMultipartUpload({vaultName: vaultName, archiveDescription
 //*/
 		  var delta = (new Date() - startTime) / 1000;
 		  console.log('Completed upload in', delta, 'seconds');
-		  console.log('Archive ID:', data.archiveId);
-		  console.log('location URI:', data.location);
-		  console.log('Checksum:  ', data.checksum);
+		  console.log('Archive ID: ', data.archiveId);
+		  console.log('Archive Name: ' + fname);
+		  console.log('location URI: ', data.location);
+		  console.log('Checksum: ', data.checksum);
 ///*
 		}
 	    });

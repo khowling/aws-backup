@@ -19,7 +19,20 @@ var glacier = new AWS.Glacier(),
 var arg1 = process.argv[2],
     arg2 = process.argv[3];
 
-console.log ("args  1: " +  arg1 + " 2: " +  arg2);
+console.log ("arg1: " +  arg1 + " 2: " +  arg2);
+
+if (typeof arg1 === "undefined") {
+	console.log ("usage::  \n\n\
+multi [uploadId]     # list Mulitpart Uploads\n\
+vault                # Describe Vault\n\
+retreive [archiveId] # initiate Job to retreive your 'inventory' or retrive an archive (can take 12hrs)\n\
+job <JobId>          # Describe Job (is job complete?)\n\
+get <JobId>          # Get results of 'inventory' job (to stdout)\n\
+getstream <location> # Get results of archive job (stream to 'file.out')\n\
+delete <archiveId>   # WARNING: Delete an archive\n\n");
+
+	return;
+}
 
 // LIST
 if (arg1 == "multi" && typeof arg2 === "undefined") {
@@ -51,17 +64,9 @@ if (arg1 == "job" && typeof arg2 !== "undefined") {
 	});
 }
 
-var gitfile = function(fname, awsloc) {
-		var opts = aws4.sign({ service: 'glacier', region: env.AWS_REGION, path: awsloc, headers: { 'X-Amz-Glacier-Version': '2012-06-01' } })
-		console.log ("HTTP GET location : " + JSON.stringify(opts));
-		var file = fs.createWriteStream(fname);
-		http.request(opts, function(res) { res.pipe(file) }).end();
-}
 
 if (arg1 == "retrieve") {
 	var jparams = { 
-		Format: "JSON", 
-		Description: "RET001", 
 		Type: ((typeof arg2 !== "undefined") ? "archive-retrieval" : "inventory-retrieval") 
 	};
 	if (typeof arg2 !== "undefined") jparams.ArchiveId = arg2;
@@ -70,6 +75,8 @@ if (arg1 == "retrieve") {
 	glacier.client.initiateJob({vaultName: vaultName, jobParameters : jparams}, function (err,data) {
 		if (err) { console.log('Error!' + err.stack); return; }
 		console.log('Completed in' + JSON.stringify(data, null, 4));
+
+/*  
 		var checkjobcomplete = function () {
 			glacier.client.describeJob({vaultName: vaultName, jobId: data.jobId}, function (jerr,jdata) {
 					if (jerr) { console.log('Error!', jerr.stack); return; }
@@ -84,17 +91,28 @@ if (arg1 == "retrieve") {
 		}
 		// wait 2mins, then check for job complete
 		setTimeout(checkjobcomplete, 120*1000);
+*/
+
 	});
 }
 
+if (arg1 == "getstream" && arg2 !== "undefined") {
+		var opts = aws4.sign({ service: 'glacier', region: env.AWS_REGION, path: arg2, headers: { 'X-Amz-Glacier-Version': '2012-06-01' } })
+		console.log ("GET to file 'file.out',  getopts : " + JSON.stringify(opts));
+		var file = fs.createWriteStream("file.out");
+		http.request(opts, function(res) { res.pipe(file) }).end();
+}
+
+
 if (arg1 == "get" && arg2 !== "undefined") {
-	gitfile ("file.out", arg2);
 /*
-        glacier.client.getJobOutput({vaultName: vaultName, jobId: arg2 }, function (err,data) {
-                 if (err) { console.log('Error!', err.stack); return; }
-                console.log('Completed data : ' + data);
-        });
+	gitfile ("file.out", arg2);
 */
+	glacier.client.getJobOutput({vaultName: vaultName, jobId: arg2 }, function (err,data) {
+		if (err) { console.log('Error!', err.stack); return; }
+		var resObj = JSON.parse(data.body);
+		console.log(JSON.stringify(resObj, null, 4));
+	});
 }
 
 

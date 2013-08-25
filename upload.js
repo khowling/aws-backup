@@ -17,7 +17,7 @@ var treehash = require('treehash');
 var glacier = new AWS.Glacier(),
     fname = process.argv[2],
     vaultName = 'hstore',
-    bufsize = 2 * 1024 * 1024;  // 2Mb chunks
+    bufsize = 64 * 1024 * 1024;  // 62 Mb chunks
 
 
 var stat = fs.statSync(fname),
@@ -30,92 +30,109 @@ var gchunks = 0, gtotsize = 0;
 
 var thStream = treehash.createTreeHashStream ();
 
-console.log('Initiating upload to' + vaultName + ', partSize: ' + bufsize.toString());
+var opts = {vaultName: vaultName, archiveDescription: fname, partSize: bufsize.toString()};
+console.log ('\n' + new Date().toUTCString() + ' : initiateMultipartUpload : ' + + JSON.stringify(opts));
 ///* 
-glacier.client.initiateMultipartUpload({vaultName: vaultName, archiveDescription: fname, partSize: bufsize.toString()}, function (mpErr, multipart) {
+glacier.client.initiateMultipartUpload(opts, function (mpErr, multipart) {
 
-	 if (mpErr) { console.log('Error!', mpErr.stack); return; }
-         console.log("Got upload ID", multipart.uploadId);
+	if (mpErr) { 
+		 console.log( new Date().toUTCString() + ' : initiateMultipartUpload error : ' + mpErr.stack);
+		 return; 
+   }
+   console.log( new Date().toUTCString() + ' : initiateMultipartUpload uploadID : ' + multipart.uploadId);
 //*/
 
-	  var finishit = function () {
+//  var tempFile = fs.createWriteStream('test.out');
+
+
+	var finishit = function () {
+//			tempFile.end();
+			var data = {};
 ///*
 	    glacier.client.completeMultipartUpload({
-		vaultName: vaultName,
-		uploadId: multipart.uploadId,
-		archiveSize: gtotsize.toString(),
-		checksum: thStream.digest() // the computed tree hash
-	      }, function(err, data) {
-		if (err) {
-		  console.log("An error occurred while uploading the archive");
-		  console.log(err);
-		} else {
+				  vaultName: vaultName,
+				  uploadId: multipart.uploadId,
+				  archiveSize: gtotsize.toString(),
+				  checksum: thStream.digest() // the computed tree hash
+				  }, function(err, data) {
+				    if (err) {
+					   console.log("An error occurred while uploading the archive");
+					   console.log(err);
+				    } else {
 //*/
-		  var delta = (new Date() - startTime) / 1000;
-		  console.log('Completed upload in', delta, 'seconds');
-		  console.log('Archive ID: ', data.archiveId);
-		  console.log('Archive Name: ' + fname);
-		  console.log('location URI: ', data.location);
-		  console.log('Checksum: ', data.checksum);
+				  	   var delta = (new Date() - startTime) / 1000;
+					   console.log('Completed upload in', delta, 'seconds');
+					   console.log('Archive ID: ', data.archiveId);
+					   console.log('Archive Name: ' + fname);
+					   console.log('location URI: ', data.location);
+					   console.log('Checksum: ', data.checksum);
 ///*
-		}
+	          	}
 	    });
 //*/
-	  };
+	};
 
-	var fileStream = fs.createReadStream(fname , {bufferSize: bufsize });
 	process.stdout.write(buffer.length+'/'+bufsize+' progress: '+gchunks+'/'+numchunks+'\r');
+	var fileStream = fs.createReadStream(fname , {bufferSize: bufsize });
 
+
+
+  var chunkarray = [],
+      chunksize = 0;
 
 	fileStream.on('data', function(chunk) {
 	//  ALWAYS RETURNS chuncks in sizes of '40960', so accumilate
-	    fileStream.pause();
 
-	    buffer = Buffer.concat ([buffer, chunk]);
-	    process.stdout.write(buffer.length+'/'+bufsize+' progress: '+gchunks+'/'+numchunks+'\r');
+			chunkarray.push(chunk);
+      chunksize += chunk.length;
+	    process.stdout.write(chunksize+'/'+bufsize+' progress: '+gchunks+'/'+numchunks+'\r');
 
-	    if (buffer.length >= bufsize) {
+        if (chunksize >= bufsize) {
 
-		var sendit = buffer.slice (0, bufsize)
-		var range = 'bytes ' + (gchunks*bufsize) + '-' +  ((gchunks*bufsize)+sendit.length-1) + '/*';
-		process.stdout.write('\nsend: '+sendit.length + ', '+ range +'\n');
+    	    fileStream.pause();
+	        buffer = Buffer.concat (chunkarray);
 
-		gchunks++, gtotsize+= sendit.length;
-		buffer = buffer.slice (bufsize, buffer.length);
-		process.stdout.write('remain: '+buffer.length+'/'+bufsize+' progress: '+gchunks+'/'+numchunks+'\n');
+				  var sendit = buffer.slice (0, bufsize)
+				  var range = 'bytes ' + (gchunks*bufsize) + '-' +  ((gchunks*bufsize)+sendit.length-1) + '/*';
+				  process.stdout.write('\nsend: '+sendit.length + ', '+ range +'\n');
 
-		thStream.update(sendit);
+//					tempFile.write(sendit);
+
+				  gchunks++, gtotsize+= sendit.length;
+
+					chunkarray = [ buffer.slice (bufsize, buffer.length) ];
+					chunksize = chunkarray[0].length;
+
+				  thStream.update(sendit);
 ///*
-                glacier.client.uploadMultipartPart( {
-		  vaultName: vaultName,
-		  uploadId: multipart.uploadId,
-		  range: range,
-		  body: sendit },  
-		 	function(err, data) {
-				if (err) {
-				  console.log("An error occurred while uploading the archive");
-				  console.log(err);
-				}	
-
+				  glacier.client.uploadMultipartPart( {
+					 vaultName: vaultName,
+					 uploadId: multipart.uploadId,
+					 range: range,
+					 body: sendit },  
+					  function(err, data) {
+						  if (err) {
+							 console.log("An error occurred while uploading the archive");
+							 console.log(err);
+						  }	
 //*/
-				fileStream.resume();
+						  fileStream.resume();
 ///*
-			});
+				  });
 //*/
-	    } else {
-		fileStream.resume();
 	    }
 	});
 
 	fileStream.on('end', function (){
-	    if (buffer.length >0) {
+	  buffer = Buffer.concat (chunkarray);
+	  if (buffer.length >0) {
+		  var range = 'bytes ' + (gchunks*bufsize) + '-' +  ((gchunks*bufsize)+buffer.length-1) + '/*';
+		  gchunks++, gtotsize+= buffer.length;
+		  process.stdout.write('\nsend: '+buffer.length + ', '+ range +' progress: '+gchunks+'/'+numchunks+'\n');
 
-		var range = 'bytes ' + (gchunks*bufsize) + '-' +  ((gchunks*bufsize)+buffer.length-1) + '/*';
-		gchunks++, gtotsize+= buffer.length;
-		process.stdout.write('\nsend: '+buffer.length + ', '+ range +' progress: '+gchunks+'/'+numchunks+'\n');
 
-
-		thStream.update(buffer);
+//		  tempFile.write(buffer);
+		  thStream.update(buffer);
 ///*
 		glacier.client.uploadMultipartPart( {
 		  vaultName: vaultName,
@@ -136,8 +153,6 @@ glacier.client.initiateMultipartUpload({vaultName: vaultName, archiveDescription
 	    } else {
 		finishit();
 	    }
-
-	//    console.log('len: ' + gtotsize + ', #chunks: ' + gchunks);
 	});
 ///*
 });

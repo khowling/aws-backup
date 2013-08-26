@@ -18,15 +18,17 @@ var glacier = new AWS.Glacier(),
 
 var arg1 = process.argv[2],
     arg2 = process.argv[3];
+    arg3 = process.argv[4];
 
 var usageExit = function() {
 	console.log ("usage:  \n\n\
 				multi [uploadId]     # list Mulitpart Uploads\n\
 				vault                # Describe Vault\n\
 				retreive [archiveId] # initiate Job to retreive your 'inventory' or retrive an archive (can take 12hrs)\n\
+				jobs                 # List all Jobs requested \n\
 				job <JobId>          # Describe Job (is job complete?)\n\
 				get <JobId>          # Get results of 'inventory' job (to stdout)\n\
-				getstream <location> <target filename> # Get results of archive job\n\
+				getstream <jobId> <target filename> # Get results of archive job\n\
 				delete <archiveId>   # WARNING: Delete an archive\n\n");
 	return;
 }
@@ -101,11 +103,27 @@ if (arg1 == "retrieve") {
 }
 
 if (arg1 == "getstream" && arg2 !== "undefined" && arg3 != "undefined" ) {
-		var opts = aws4.sign({ service: 'glacier', region: env.AWS_REGION, path: arg2, headers: { 'X-Amz-Glacier-Version': '2012-06-01' } })
+		var opts = aws4.sign({ service: 'glacier', region: env.AWS_REGION, path: '/-/vaults/'+vaultName+'/jobs/'+arg2+'/output', headers: { 'X-Amz-Glacier-Version': '2012-06-01' } })
 	  console.log ('\n' + new Date().toUTCString() + ' : get requested to file <'+ arg3 +'> : ' + JSON.stringify(opts));
 		var file = fs.createWriteStream(arg3);
-		http.request(opts, function(res) { res.pipe(file) }).end();
+		var req = http.request(opts, function(res) { 
+			console.log('STATUS: ' + res.statusCode);
+  		console.log('HEADERS: ' + JSON.stringify(res.headers));
+			res.pipe(file);
+		 		}).on ('error', function (e) {
+		console.log('problem with request: ' + e.message);
+	}).end();
+ 
 }
+
+if (arg1 == "jobs") {
+	console.log ('\n' + new Date().toUTCString() + ' : get jobs');
+	glacier.client.listJobs({vaultName: vaultName }, function (err,data) {
+		if (err) { console.log(new Date().toUTCString() + ' : get jobs error : ' +  err.stack); return; }
+	  	console.log (new Date().toUTCString() + ' : get jobs completed : ' + JSON.stringify(data, null, 4));
+	});
+}
+
 
 
 if (arg1 == "get" && arg2 !== "undefined") {

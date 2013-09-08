@@ -27,6 +27,9 @@ To initiate an "archive retrieval" job you must know the ID of the archive that 
 # initiate a multi-part upload (does a nohup) output to logfile
 uploadbg.sh <filename>  
 
+# retry individual parts failed from prevoius mutli upload attempt
+nodejs upload.js <filename> <uploadID> <startbyte> <startbyte> ....
+
 #  list the parts of a specific multipart upload. It returns information about the parts that you have uploaded for a multipart upload
 nodejs list.js multi <uploadId>
 
